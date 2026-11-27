@@ -43,9 +43,13 @@ local function drawCacheReplay(self, key, sig, offsetX, offsetY)
 	cache.x, cache.y = offsetX, offsetY
 	return true
 end
-local function drawCacheBegin()
+local function drawCacheBegin(sig)
 	local ops = { }
 	local saved = { }
+	if sig == nil then
+		-- Not cacheable this frame (tooltip, heat map, search...): draw directly, record nothing.
+		return ops, saved
+	end
 	for _, name in ipairs(drawCacheWrapped) do
 		local fn = _G[name]
 		saved[name] = fn
@@ -111,7 +115,7 @@ def wrap(src: str, start: str, end: str, key: str, sig: str) -> str:
     pre = (
         f"\tlocal pobWebSig_{key} = {sig}\n"
         f"\tif not drawCacheReplay(self, \"{key}\", pobWebSig_{key}, offsetX, offsetY) then\n"
-        f"\tlocal pobWebOps, pobWebSaved = drawCacheBegin()\n"
+        f"\tlocal pobWebOps, pobWebSaved = drawCacheBegin(pobWebSig_{key})\n"
         f"\tlocal pobWebOk, pobWebErr = pcall(function()\n"
     )
     post = (
