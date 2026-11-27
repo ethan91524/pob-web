@@ -81,6 +81,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "No Cloudflare token; skipping"; exit 0; fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then unset CLOUDFLARE_ACCOUNT_ID; fi
           npx -y wrangler@4.20.0 pages project create pob-web --production-branch main || true
           npx -y wrangler@4.20.0 pages deploy packages/driver/site-cf --project-name pob-web --branch main --commit-dirty=true
       - uses: actions/upload-pages-artifact@v3
