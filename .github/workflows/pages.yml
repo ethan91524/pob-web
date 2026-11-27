@@ -51,6 +51,38 @@ jobs:
           find $OUT -name '*.map' -delete
           touch $OUT/.nojekyll
           du -sh $OUT; ls -la $OUT $OUT/assets | head -60; find $OUT -size +50M -exec ls -la {} \;
+      - name: Build Cloudflare site
+        working-directory: packages/driver
+        env:
+          BASE_PATH: /
+          ASSET_PREFIX: /r2
+          RUN_GAME: poe1
+          RUN_VERSION: ${{ env.POB_TAG }}
+          RUN_BUILD: release
+        run: |
+          rm -rf site-gh && mv site site-gh
+          deno task vite:build
+          mv site site-cf && mv site-gh site
+      - name: Assemble Cloudflare site
+        run: |
+          OUT=packages/driver/site-cf
+          V=$OUT/r2/games/poe1/versions/$POB_TAG
+          mkdir -p $OUT/r2/games/poe1/versions
+          cp -r packages/packer/r2/games/poe1/versions/$POB_TAG $OUT/r2/games/poe1/versions/
+          rm -f $V/.pack-input.sha256
+          find $OUT -name '*.map' -delete
+          (cd $V && split -b 20M -d -a 3 root.zip root.zip. && rm root.zip && python3 -c "import glob,json;print(json.dumps({'parts':sorted(glob.glob('root.zip.[0-9]*'))}))" > root.zip.parts.json && cat root.zip.parts.json)
+          printf '%s\n' '/*' '  Cross-Origin-Opener-Policy: same-origin' '  Cross-Origin-Embedder-Policy: require-corp' '  Cross-Origin-Resource-Policy: same-origin' '/r2/*' '  Cache-Control: public, max-age=31536000, immutable' > $OUT/_headers
+          echo "files: $(find $OUT -type f | wc -l)"; du -sh $OUT
+          echo "over 25MiB:"; find $OUT -type f -size +25M -exec ls -la {} \;
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "No Cloudflare token; skipping"; exit 0; fi
+          npx -y wrangler@4.20.0 pages project create pob-web --production-branch main || true
+          npx -y wrangler@4.20.0 pages deploy packages/driver/site-cf --project-name pob-web --branch main --commit-dirty=true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: packages/driver/site

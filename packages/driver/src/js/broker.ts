@@ -19,6 +19,41 @@ type BrokerCallbacks = {
   paste: () => Promise<string>;
 };
 
+// Hosts with a per-file size limit serve root.zip as numbered parts listed in root.zip.parts.json.
+async function loadRootZipParts(assetPrefix: string): Promise<ArrayBuffer | undefined> {
+  let parts: string[];
+  try {
+    const manifest = await fetch(`${assetPrefix}/root.zip.parts.json`);
+    if (!manifest.ok) return undefined;
+    const parsed = await manifest.json();
+    if (!Array.isArray(parsed?.parts) || parsed.parts.length === 0) return undefined;
+    parts = parsed.parts;
+  } catch {
+    return undefined;
+  }
+  const buffers = await Promise.all(parts.map(async (part) => {
+    const response = await fetch(`${assetPrefix}/${part}`);
+    if (!response.ok) throw new Error(`Failed to load ${part} (${response.status} ${response.statusText})`);
+    return new Uint8Array(await response.arrayBuffer());
+  }));
+  const total = buffers.reduce((sum, buffer) => sum + buffer.byteLength, 0);
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const buffer of buffers) {
+    joined.set(buffer, offset);
+    offset += buffer.byteLength;
+  }
+  return joined.buffer;
+}
+
+async function loadRootZip(assetPrefix: string): Promise<ArrayBuffer> {
+  const fromParts = await loadRootZipParts(assetPrefix);
+  if (fromParts) return fromParts;
+  const rootZip = await fetch(`${assetPrefix}/root.zip`);
+  if (!rootZip.ok) throw new Error(`Failed to load root.zip (${rootZip.status} ${rootZip.statusText})`);
+  return await rootZip.arrayBuffer();
+}
+
 class AsyncBroker {
   private callbacks: BrokerCallbacks | undefined;
   private eventPort: MessagePort | undefined;
@@ -42,9 +77,7 @@ class AsyncBroker {
     this.filesystem.reset(this.cloudDirectory);
     let rootZipData: ArrayBuffer;
     try {
-      const rootZip = await fetch(`${assetPrefix}/root.zip`);
-      if (!rootZip.ok) throw new Error(`Failed to load root.zip (${rootZip.status} ${rootZip.statusText})`);
-      rootZipData = await rootZip.arrayBuffer();
+      rootZipData = await loadRootZip(assetPrefix);
     } catch (error) {
       throw markEnvironmentError(error, "assetLoad");
     }
