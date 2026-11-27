@@ -23,7 +23,12 @@ local drawCacheShift = { DrawImage = { 2, 1 }, DrawImageQuad = { 2, 4 }, DrawStr
 local function drawCacheReplay(self, key, sig, offsetX, offsetY)
 	local cache = self.pobWebDrawCache and self.pobWebDrawCache[key]
 	if not cache or cache.sig ~= sig then
-		return false
+		-- Record only once the same state shows up two frames in a row, so frames that change
+		-- state (crossing nodes) do not pay for recording on top of the redraw.
+		self.pobWebLastSig = self.pobWebLastSig or { }
+		local stable = sig ~= nil and self.pobWebLastSig[key] == sig
+		self.pobWebLastSig[key] = sig
+		return false, stable
 	end
 	local dx, dy = offsetX - cache.x, offsetY - cache.y
 	local ops = cache.ops
@@ -114,7 +119,9 @@ def wrap(src: str, start: str, end: str, key: str, sig: str) -> str:
     body = src[a:b]
     pre = (
         f"\tlocal pobWebSig_{key} = {sig}\n"
-        f"\tif not drawCacheReplay(self, \"{key}\", pobWebSig_{key}, offsetX, offsetY) then\n"
+        f"\tlocal pobWebHit_{key}, pobWebStable_{key} = drawCacheReplay(self, \"{key}\", pobWebSig_{key}, offsetX, offsetY)\n"
+        f"\tif not pobWebHit_{key} then\n"
+        f"\tif not pobWebStable_{key} then pobWebSig_{key} = nil end\n"
         f"\tlocal pobWebOps, pobWebSaved = drawCacheBegin(pobWebSig_{key})\n"
         f"\tlocal pobWebOk, pobWebErr = pcall(function()\n"
     )
