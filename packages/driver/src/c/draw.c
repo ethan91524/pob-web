@@ -499,7 +499,32 @@ static int DrawStringCursorIndex(lua_State *L) {
     return 1;
 }
 
+// pob-web: TranslateText(text) returns the Traditional Chinese display text (or the input unchanged),
+// so Lua-side searches can match what the user sees.
+static int TranslateText(lua_State *L) {
+    const char *text = luaL_checkstring(L, 1);
+    char *out = (char *)EM_ASM_PTR({
+        const src = UTF8ToString($0);
+        const res = Module.translateText ? Module.translateText(src) : src;
+        if (res === src) return 0;
+        const len = lengthBytesUTF8(res);
+        const buf = Module._malloc(len + 1);
+        stringToUTF8(res, buf, len + 1);
+        return buf;
+    }, text);
+    if (!out) {
+        lua_pushvalue(L, 1);
+        return 1;
+    }
+    lua_pushstring(L, out);
+    free(out);
+    return 1;
+}
+
 void draw_init(lua_State *L) {
+    lua_pushcclosure(L, TranslateText, 0);
+    lua_setglobal(L, "TranslateText");
+
     lua_pushcclosure(L, RenderInit, 0);
     lua_setglobal(L, "RenderInit");
 

@@ -248,6 +248,8 @@ export const KeyboardHandler = {
     el.addEventListener(
       "keydown",
       (e) => {
+        // Let the input method (注音, 倉頡, pinyin...) compose; its result arrives in compositionend.
+        if (e.isComposing || e.keyCode === 229) return;
         const key: unknown = e.key;
         if (typeof key !== "string" || key.length === 0) {
           e.preventDefault();
@@ -273,8 +275,21 @@ export const KeyboardHandler = {
     );
 
     el.addEventListener(
+      "compositionend",
+      (e) => {
+        for (const char of e.data ?? "") keyboardState.keypress(char);
+        // The browser inserted the composed text into the editable container; drop it.
+        for (const node of [...el.childNodes]) {
+          if (node.nodeType === Node.TEXT_NODE) node.remove();
+        }
+      },
+      { signal },
+    );
+
+    el.addEventListener(
       "keyup",
       (e) => {
+        if (e.isComposing || e.keyCode === 229) return;
         e.preventDefault();
         const key: unknown = e.key;
         if (typeof key !== "string" || key.length === 0) {

@@ -5,6 +5,34 @@ package.path = package.path .. ";/app/root/lua/?.lua;/app/root/lua/?/init.lua"
 unpack = table.unpack
 loadstring = load
 
+-- pob-web: expose luautf8 as the utf8 global, like PoeCharm does, so PoB turns on its
+-- Unicode mode (text boxes accept Chinese and move the caret by whole characters).
+utf8 = require("lua-utf8")
+
+-- pob-web: searchable text = English (lowercase) plus its Chinese display text, so searches
+-- typed in either language match. Patched into PoB's search functions at deploy time.
+local searchTextCache = {}
+local searchTextCount = 0
+function PobWebSearchText(text)
+    if type(text) ~= "string" then
+        return ""
+    end
+    local cached = searchTextCache[text]
+    if cached then
+        return cached
+    end
+    local lower = text:lower()
+    local zh = TranslateText and TranslateText(text) or text
+    local out = zh ~= text and (lower .. "\n" .. zh:lower()) or lower
+    if searchTextCount > 100000 then
+        searchTextCache = {}
+        searchTextCount = 0
+    end
+    searchTextCache[text] = out
+    searchTextCount = searchTextCount + 1
+    return out
+end
+
 bit = {
     lshift = bit32.lshift,
     rshift = bit32.rshift,
@@ -176,11 +204,33 @@ mainObject["OnInit"] = function(self)
     self.main.controls.checkUpdate.shown = function()
         return false
     end
+    -- pob-web: open the build list in the Cloud folder (when signed in) so builds created or
+    -- saved from there sync to every device. Only the first time; navigating elsewhere sticks.
+    local listMode = self.main.modes["LIST"]
+    local initList = listMode and listMode.Init
+    if initList then
+        listMode.Init = function(list, selBuildName, subPath, ...)
+            if subPath == nil and list.subPath == nil then
+                local ok, handle = pcall(NewFileSearch, self.main.buildPath .. "Cloud", true)
+                if ok and handle then
+                    subPath = "Cloud/"
+                end
+            end
+            return initList(list, selBuildName, subPath, ...)
+        end
+    end
     local buildMode = self.main.modes["BUILD"]
     local initBuild = buildMode.Init
     buildMode.Init = function(build, ...)
         initBuild(build, ...)
         installOAuthLogoutHook(build)
+        -- A new, never-saved build defaults to the Cloud folder too.
+        if not build.dbFileName and (build.dbFileSubPath or "") == "" then
+            local ok, handle = pcall(NewFileSearch, self.main.buildPath .. "Cloud", true)
+            if ok and handle then
+                build.dbFileSubPath = "Cloud/"
+            end
+        end
     end
 end
 

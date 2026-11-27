@@ -381,6 +381,7 @@ export class DriverWorker {
       },
       getStringWidth: (size: number, font: number, text: string) =>
         this.textMetrics?.measure(size, font, translator.t(text)) ?? 0,
+      translateText: (text: string) => translator.t(text),
       getStringCursorIndex: (size: number, font: number, text: string, cursorX: number, cursorY: number) =>
         this.textMetrics?.measureCursorIndex(size, font, text, cursorX, cursorY) ?? 0,
       copy: (text: string) => this.mainCallbacks?.copy(text),

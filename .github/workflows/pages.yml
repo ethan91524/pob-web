@@ -35,6 +35,8 @@ jobs:
         run: python3 .github/scripts/split_lazy.py "packages/packer/r2/games/poe1/versions/$POB_TAG"
       - name: Cache passive tree draw calls (web Lua is slower than LuaJIT)
         run: python3 .github/scripts/patch_tree_cache.py "packages/packer/r2/games/poe1/versions/$POB_TAG/root.zip"
+      - name: Let searches match the Chinese display text
+        run: python3 .github/scripts/patch_zh_search.py "packages/packer/r2/games/poe1/versions/$POB_TAG/root.zip"
       - name: Build site
         working-directory: packages/driver
         env:
