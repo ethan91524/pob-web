@@ -274,14 +274,38 @@ export const KeyboardHandler = {
       { signal },
     );
 
+    // The browser inserts composed/typed text into the editable container; drop it after use.
+    const dropInsertedText = () => {
+      for (const node of [...el.childNodes]) {
+        if (node.nodeType === Node.TEXT_NODE) node.remove();
+      }
+    };
+    let lastComposed = "";
+    let lastComposedAt = 0;
     el.addEventListener(
       "compositionend",
       (e) => {
-        for (const char of e.data ?? "") keyboardState.keypress(char);
-        // The browser inserted the composed text into the editable container; drop it.
-        for (const node of [...el.childNodes]) {
-          if (node.nodeType === Node.TEXT_NODE) node.remove();
+        const text = e.data ?? "";
+        for (const char of text) keyboardState.keypress(char);
+        lastComposed = text;
+        lastComposedAt = performance.now();
+        dropInsertedText();
+      },
+      { signal },
+    );
+    // Some input methods (and Safari after composition) commit with a plain insertText instead.
+    el.addEventListener(
+      "input",
+      (e) => {
+        const ie = e as InputEvent;
+        const text = ie.data ?? "";
+        const fromComposition = ie.isComposing || ie.inputType.includes("Composition") ||
+          (text === lastComposed && performance.now() - lastComposedAt < 1000);
+        // Plain ASCII already went through keydown.
+        if (!fromComposition && text && /[^\x00-\x7f]/.test(text)) {
+          for (const char of text) keyboardState.keypress(char);
         }
+        if (!ie.isComposing) dropInsertedText();
       },
       { signal },
     );

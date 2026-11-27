@@ -15,7 +15,14 @@ export class EventHandler {
     private el: HTMLElement,
     private callbacks: EventCallbacks,
   ) {
-    this.preventDefault = (e: Event) => e.preventDefault();
+    this.preventDefault = (e: Event) => {
+      // Safari lets pages cancel input-method composition (注音 etc.); let it through and
+      // let insertText through too, the keyboard handler forwards the text and cleans up.
+      if (e instanceof InputEvent && e.type === "beforeinput") {
+        if (e.isComposing || e.inputType.includes("Composition") || e.inputType === "insertText") return;
+      }
+      e.preventDefault();
+    };
     this.handleVisibilityChange = () => {
       this.callbacks.onVisibilityChange(this.el.ownerDocument.visibilityState === "visible");
     };
