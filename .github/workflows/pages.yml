@@ -31,6 +31,8 @@ jobs:
         run: mise run driver:build
       - name: Pack PoE1 PoB
         run: mise run pack --game poe1 --tag "$POB_TAG"
+      - name: Split lazy-loaded data out of root.zip
+        run: python3 .github/scripts/split_lazy.py "packages/packer/r2/games/poe1/versions/$POB_TAG"
       - name: Build site
         working-directory: packages/driver
         env:
@@ -71,8 +73,8 @@ jobs:
           cp -r packages/packer/r2/games/poe1/versions/$POB_TAG $OUT/r2/games/poe1/versions/
           rm -f $V/.pack-input.sha256
           find $OUT -name '*.map' -delete
-          (cd $V && split -b 20M -d -a 3 root.zip root.zip. && rm root.zip && python3 -c "import glob,json;print(json.dumps({'parts':sorted(glob.glob('root.zip.[0-9]*'))}))" > root.zip.parts.json && cat root.zip.parts.json)
-          printf '%s\n' '/*' '  Cross-Origin-Opener-Policy: same-origin' '  Cross-Origin-Embedder-Policy: require-corp' '  Cross-Origin-Resource-Policy: same-origin' '/r2/*' '  Cache-Control: public, max-age=31536000, immutable' > $OUT/_headers
+          (cd $V && H=$(sha256sum root.zip | cut -c1-10) && split -b 20M -d -a 3 root.zip "root.$H." && rm root.zip && python3 -c "import glob,json;print(json.dumps({'parts':sorted(glob.glob('root.*.[0-9][0-9][0-9]'))}))" > root.parts.json && cat root.parts.json)
+          printf '%s\n' '/*' '  Cross-Origin-Opener-Policy: same-origin' '  Cross-Origin-Embedder-Policy: require-corp' '  Cross-Origin-Resource-Policy: same-origin' > $OUT/_headers
           echo "files: $(find $OUT -type f | wc -l)"; du -sh $OUT
           echo "over 25MiB:"; find $OUT -type f -size +25M -exec ls -la {} \;
       - name: Deploy to Cloudflare Pages

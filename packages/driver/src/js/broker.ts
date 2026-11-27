@@ -19,11 +19,11 @@ type BrokerCallbacks = {
   paste: () => Promise<string>;
 };
 
-// Hosts with a per-file size limit serve root.zip as numbered parts listed in root.zip.parts.json.
+// Hosts with a per-file size limit serve root.zip as numbered parts listed in root.parts.json.
 async function loadRootZipParts(assetPrefix: string): Promise<ArrayBuffer | undefined> {
   let parts: string[];
   try {
-    const manifest = await fetch(`${assetPrefix}/root.zip.parts.json`);
+    const manifest = await fetch(`${assetPrefix}/root.parts.json`);
     if (!manifest.ok) return undefined;
     const parsed = await manifest.json();
     if (!Array.isArray(parsed?.parts) || parsed.parts.length === 0) return undefined;
@@ -97,12 +97,26 @@ class AsyncBroker {
       throw markEnvironmentError(error, "storage");
     }
 
-    await zenfs.configure({
-      mounts: {
-        "/root": rootFileSystem,
-        "/user": userFileSystem,
-      },
-    });
+    let lazyManifest: { dir: string; files: string[] } | undefined;
+    try {
+      const response = await fetch(`${assetPrefix}/lazy.json`);
+      if (response.ok) {
+        const parsed = await response.json();
+        if (typeof parsed?.dir === "string" && Array.isArray(parsed?.files)) lazyManifest = parsed;
+      }
+    } catch {
+      lazyManifest = undefined;
+    }
+
+    const mounts: Record<string, Awaited<ReturnType<typeof zenfs.resolveMountConfig>>> = {
+      "/root": rootFileSystem,
+      "/user": userFileSystem,
+    };
+    if (lazyManifest) {
+      mounts[`/root/${lazyManifest.dir}`] = await zenfs.resolveMountConfig({ backend: zenfs.InMemory });
+    }
+    await zenfs.configure({ mounts });
+    if (lazyManifest) this.filesystem.setLazyFiles(assetPrefix, lazyManifest.dir, lazyManifest.files);
     const settingsPath = `/user/${config.userDirectory}/Settings.xml`;
     if (await removeStaleSettingsSuffix(settingsPath, config.settingsRootElement)) {
       console.warn("Removed stale data after game settings", { settingsPath });

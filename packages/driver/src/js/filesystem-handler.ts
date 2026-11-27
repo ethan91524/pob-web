@@ -43,8 +43,42 @@ export class FilesystemRpcHandler {
     }
   }
 
+  private lazy:
+    | { assetPrefix: string; dir: string; files: Set<string>; pending: Map<string, Promise<void>> }
+    | undefined;
+
+  // Files listed here are left out of root.zip and fetched the first time PoB touches them.
+  setLazyFiles(assetPrefix: string, dir: string, files: string[]) {
+    this.lazy = { assetPrefix, dir, files: new Set(files), pending: new Map() };
+  }
+
+  private async ensureLazyFile(path: unknown) {
+    const lazy = this.lazy;
+    if (!lazy || typeof path !== "string") return;
+    const marker = `${lazy.dir}/`;
+    const index = path.indexOf(marker);
+    if (index < 0) return;
+    const name = path.slice(index + marker.length);
+    if (!lazy.files.has(name)) return;
+    let pending = lazy.pending.get(name);
+    if (!pending) {
+      pending = (async () => {
+        const response = await fetch(`${lazy.assetPrefix}/lazy/${lazy.dir}/${name}`);
+        if (!response.ok) throw new Error(`Failed to load ${name} (${response.status})`);
+        await zenfs.fs.promises.writeFile(`/root/${lazy.dir}/${name}`, new Uint8Array(await response.arrayBuffer()));
+        lazy.files.delete(name);
+      })();
+      lazy.pending.set(name, pending);
+      pending.catch(() => lazy.pending.delete(name));
+    }
+    await pending;
+  }
+
   private async handleOperation(operation: string, args: unknown[], data?: Uint8Array): Promise<RpcResult> {
     const fs = zenfs.fs;
+    if (operation === "stat" || operation === "lstat" || operation === "open") {
+      await this.ensureLazyFile(args[0]);
+    }
     switch (operation) {
       case "readdir": {
         const entries = await fs.promises.readdir(args[0] as string, { withFileTypes: true });
