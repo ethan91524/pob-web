@@ -252,6 +252,8 @@ export class Driver {
     container.focus();
     container.style.outline = "none";
     container.style.caretColor = "transparent";
+    // contentEditable (needed for keyboard/IME input) makes browsers show the text I-beam; PoB is not a text field.
+    container.style.cursor = "default";
 
     document.addEventListener("fullscreenchange", () => this.handleFullscreenChange());
 
