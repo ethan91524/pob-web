@@ -2,6 +2,7 @@ import { Format, Target, Texture } from "dds";
 import { DrawCommandCompiler, type DrawCommandSink } from "../draw.ts";
 import { type ImageRepository, type TextureBitmap, TextureFlags, TextureSource } from "../image.ts";
 import type { BackendStats, RenderBackend } from "./backend.ts";
+import { translator } from "./i18n.ts";
 import { GlyphAtlas, type GlyphAtlasStats, type TextMetrics } from "./text.ts";
 
 const WHITE_TEXTURE_BITMAP: TextureBitmap = (() => {
@@ -282,7 +283,7 @@ export class Renderer implements DrawCommandSink {
 
   drawString(x: number, y: number, align: number, height: number, font: number, text: string) {
     const pos = { x, y };
-    for (const line of text.split("\n")) {
+    for (const line of translator.t(text).split("\n")) {
       this.drawStringLine(pos, align, height, font, line);
     }
   }

@@ -159,11 +159,21 @@ async function main(): Promise<void> {
       },
     },
   );
+  // Signed in (session cookie checked by the site middleware) → enable the Builds/Cloud folder.
+  let cloudToken: string | undefined;
+  if (!testMode) {
+    try {
+      const me = await fetch(`${import.meta.env.BASE_URL}api/me`, { cache: "no-store" });
+      if (me.ok && (me.headers.get("content-type") ?? "").includes("json")) cloudToken = "session";
+    } catch {
+      cloudToken = undefined;
+    }
+  }
   await driver.start({
     userDirectory: gameData[game as Game].userDirectory,
     settingsRootElement: gameData[game as Game].settingsRootElement,
-    cloudflareKvPrefix: "/api/kv/",
-    cloudflareKvAccessToken: undefined,
+    cloudflareKvPrefix: `${import.meta.env.BASE_URL}api/kv/`,
+    cloudflareKvAccessToken: cloudToken,
     cloudflareKvUserNamespace: undefined,
   });
   const root = document.querySelector("#window") as HTMLElement;

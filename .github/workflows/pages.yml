@@ -66,6 +66,8 @@ jobs:
           deno task vite:build
           mv site site-cf && mv site-gh site
       - name: Assemble Cloudflare site
+        env:
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: |
           OUT=packages/driver/site-cf
           V=$OUT/r2/games/poe1/versions/$POB_TAG
@@ -74,18 +76,28 @@ jobs:
           rm -f $V/.pack-input.sha256
           find $OUT -name '*.map' -delete
           (cd $V && H=$(sha256sum root.zip | cut -c1-10) && split -b 20M -d -a 3 root.zip "root.$H." && rm root.zip && python3 -c "import glob,json;print(json.dumps({'parts':sorted(glob.glob('root.*.[0-9][0-9][0-9]'))}))" > root.parts.json && cat root.parts.json)
-          printf '%s\n' '/*' '  Cross-Origin-Opener-Policy: same-origin' '  Cross-Origin-Embedder-Policy: require-corp' '  Cross-Origin-Resource-Policy: same-origin' > $OUT/_headers
+          sed -i "s/__GOOGLE_CLIENT_ID__/$GOOGLE_CLIENT_ID/" $OUT/login.html
+          ZH=$RUNNER_TEMP/zh-rTW; mkdir -p $ZH
+          for f in Flask_tag GUI Gems_data.txt Gems_tag Items_Accessories.txt Items_Armour.txt Items_Gems.txt Items_Jewels.txt Items_Oils Items_Weapons.txt Monsters Uniques.txt Z passiveTree statDescriptions stats_words_prefix stats_words_suffix tree_dn tree_sd; do
+            curl -fsSL -o "$ZH/$f.csv" "https://raw.githubusercontent.com/Chuanhsing/PoeCharm/HEAD/Data/Translate/zh-rTW/$f.csv"
+          done
+          python3 .github/scripts/build_zh.py $ZH $OUT/i18n/zh-TW.json
           echo "files: $(find $OUT -type f | wc -l)"; du -sh $OUT
           echo "over 25MiB:"; find $OUT -type f -size +25M -exec ls -la {} \;
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "No Cloudflare token; skipping"; exit 0; fi
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then unset CLOUDFLARE_ACCOUNT_ID; fi
-          npx -y wrangler@4.20.0 pages project create pob-web --production-branch main || true
-          cd packages/driver && npx -y wrangler@4.20.0 pages deploy site-cf --project-name pob-web --branch main --commit-dirty=true
+          W="npx -y wrangler@4.20.0"
+          $W pages project create pob-web --production-branch main || true
+          cd packages/driver
+          python3 ../../.github/scripts/cloudflare_config.py "$W" pob-web-kv > wrangler.toml
+          cat wrangler.toml
+          $W pages deploy site-cf --project-name pob-web --branch main --commit-dirty=true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: packages/driver/site

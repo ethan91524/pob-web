@@ -9,6 +9,7 @@ import { log, tag } from "./logger.ts";
 import type { MouseState } from "./mouse-handler.ts";
 import type { PoeOAuthAuthorization } from "./poe-oauth.ts";
 import { loadFonts, Renderer, type RenderStats, TextMetrics, WebGL2Backend } from "./renderer/index.ts";
+import { translator } from "./renderer/i18n.ts";
 import { createRpcClient } from "./rpc.ts";
 import { registerSentryWasm } from "./sentry-wasm.ts";
 
@@ -103,6 +104,7 @@ export class DriverWorker {
     this.imageRepo = new ImageRepository(`${assetPrefix}/root/`);
 
     await loadFonts();
+    await translator.load("/i18n/zh-TW.json");
     this.textMetrics = new TextMetrics();
     this.renderer = new Renderer(this.imageRepo, this.textMetrics, this.screenSize);
     this.hostCallbacks = {
@@ -369,7 +371,8 @@ export class DriverWorker {
       drawCommit: (bufferPtr: number, size: number) => {
         this.renderer?.render(new DataView(module.HEAPU8.buffer, bufferPtr, size));
       },
-      getStringWidth: (size: number, font: number, text: string) => this.textMetrics?.measure(size, font, text) ?? 0,
+      getStringWidth: (size: number, font: number, text: string) =>
+        this.textMetrics?.measure(size, font, translator.t(text)) ?? 0,
       getStringCursorIndex: (size: number, font: number, text: string, cursorX: number, cursorY: number) =>
         this.textMetrics?.measureCursorIndex(size, font, text, cursorX, cursorY) ?? 0,
       copy: (text: string) => this.mainCallbacks?.copy(text),

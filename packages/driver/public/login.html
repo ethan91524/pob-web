@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登入 · Path of Building</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #1e232a;
+         color: #e6e1d6; font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif; }
+  .card { width: min(360px, calc(100vw - 32px)); padding: 32px 24px; border-radius: 12px; background: #2a3038;
+          box-shadow: 0 8px 30px rgba(0,0,0,.35); text-align: center; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { margin: 0 0 24px; color: #a9b0ba; font-size: 14px; line-height: 1.6; }
+  button { width: 100%; padding: 12px 16px; border: 0; border-radius: 8px; background: #fff; color: #1f1f1f;
+           font-size: 15px; font-weight: 600; cursor: pointer; display: flex; gap: 10px; align-items: center;
+           justify-content: center; }
+  button:disabled { opacity: .6; cursor: default; }
+  .msg { margin-top: 16px; min-height: 1.4em; font-size: 13px; color: #f0a35e; }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Path of Building</h1>
+  <p>登入後可以使用，存在「Cloud」資料夾的 build 會在你所有裝置同步。</p>
+  <button id="go" type="button">
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+    使用 Google 登入
+  </button>
+  <div class="msg" id="msg"></div>
+</main>
+<script>
+  const CLIENT_ID = "__GOOGLE_CLIENT_ID__";
+  const btn = document.getElementById("go");
+  const msg = document.getElementById("msg");
+  const store = {
+    get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, v); } catch {} },
+  };
+
+  btn.addEventListener("click", () => {
+    const nonce = crypto.randomUUID();
+    store.set("pob_nonce", nonce);
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      redirect_uri: location.origin + "/login.html",
+      response_type: "id_token",
+      scope: "openid email",
+      nonce,
+      prompt: "select_account",
+    });
+    location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params;
+  });
+
+  (async () => {
+    const hash = new URLSearchParams(location.hash.slice(1));
+    history.replaceState(null, "", location.pathname);
+    if (hash.get("error")) { msg.textContent = "登入被取消或失敗，請再試一次。"; return; }
+    const idToken = hash.get("id_token");
+    if (!idToken) return;
+    btn.disabled = true;
+    msg.textContent = "登入中…";
+    try {
+      const payload = JSON.parse(atob(idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (payload.nonce !== store.get("pob_nonce")) throw new Error("nonce");
+      const r = await fetch("/api/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+      if (!r.ok) throw new Error("session");
+      location.replace("/");
+    } catch {
+      btn.disabled = false;
+      msg.textContent = "登入失敗，請再試一次。";
+    }
+  })();
+</script>
+</body>
+</html>

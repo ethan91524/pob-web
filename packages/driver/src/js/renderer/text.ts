@@ -27,7 +27,14 @@ export async function loadFont(url: string, family: string) {
   }
 }
 
+// Chinese glyphs are missing from PoB's fonts; fall back to the system CJK font.
+const CJK_FALLBACK = `, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", "Noto Sans CJK TC", sans-serif`;
+
 function font(size: number, fontNum: number) {
+  return baseFont(size, fontNum) + CJK_FALLBACK;
+}
+
+function baseFont(size: number, fontNum: number) {
   const fontSize = size - 2;
   switch (fontNum) {
     case 1:
