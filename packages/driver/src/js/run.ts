@@ -58,12 +58,46 @@ async function main(): Promise<void> {
       },
       onFetch: async (url, headers, body) => {
         if (!poeOAuth) {
-          const response = await fetch(url, { method: body ? "POST" : "GET", headers, body });
-          const responseHeaders: Record<string, string> = {};
-          response.headers.forEach((value, key) => {
-            responseHeaders[key] = value;
-          });
-          return { body: await response.text(), error: undefined, headers: responseHeaders, status: response.status };
+          const relayHosts = [
+            "maxroll.gg",
+            "pob.codes",
+            "api.pob.codes",
+            "pobb.in",
+            "poe.ninja",
+            "pastebin.com",
+            "pastebinp.com",
+            "rentry.co",
+            "poedb.tw",
+          ];
+          let host = "";
+          try {
+            host = new URL(url).hostname.replace(/^www\./, "");
+          } catch {
+            // leave host empty; the direct fetch below reports the error
+          }
+          try {
+            if (relayHosts.includes(host)) {
+              const relay = await fetch(`${import.meta.env.BASE_URL}api/fetch`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ url, headers, body }),
+              });
+              if (relay.ok || relay.status === 403) return await relay.json();
+            }
+            const response = await fetch(url, { method: body ? "POST" : "GET", headers, body });
+            const responseHeaders: Record<string, string> = {};
+            response.headers.forEach((value, key) => {
+              responseHeaders[key] = value;
+            });
+            return { body: await response.text(), error: undefined, headers: responseHeaders, status: response.status };
+          } catch (error) {
+            return {
+              body: "",
+              error: error instanceof Error ? error.message : String(error),
+              headers: {},
+              status: undefined,
+            };
+          }
         }
         poeOAuth.fetchRequests.push({ url, headers, body });
 
