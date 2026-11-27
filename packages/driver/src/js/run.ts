@@ -172,7 +172,7 @@ async function main(): Promise<void> {
   await driver.start({
     userDirectory: gameData[game as Game].userDirectory,
     settingsRootElement: gameData[game as Game].settingsRootElement,
-    cloudflareKvPrefix: `${import.meta.env.BASE_URL}api/kv/`,
+    cloudflareKvPrefix: `${import.meta.env.BASE_URL}api/kv`,
     cloudflareKvAccessToken: cloudToken,
     cloudflareKvUserNamespace: undefined,
   });
