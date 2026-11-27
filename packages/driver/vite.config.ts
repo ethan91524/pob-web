@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
   const usePobCoolAsset = mode === "development" && Deno.env.get("POB_COOL_ASSET") === "true";
 
   return {
+    base: Deno.env.get("BASE_PATH") ?? "/",
     cacheDir: path.join(packageDir, "node_modules", `.vite-${dependencyHash}`),
     resolve: {
       alias: {
@@ -52,7 +53,7 @@ export default defineConfig(({ mode }) => {
       __BPTC_SUPPORT_OVERRIDE__: Deno.env.get("BPTC_SUPPORT_OVERRIDE") === "false" ? "false" : "undefined",
       __MAX_RENDERING_DIMENSION_OVERRIDE__: "undefined",
       __ASSET_PREFIX__: JSON.stringify(
-        isDriverShell ? (usePobCoolAsset ? "/__pob_asset" : `/@fs/${packerR2Dir}`) : "https://asset.pob.cool",
+        Deno.env.get("ASSET_PREFIX") ?? (isDriverShell ? (usePobCoolAsset ? "/__pob_asset" : `/@fs/${packerR2Dir}`) : "https://asset.pob.cool"),
       ),
       __RUN_GAME__: JSON.stringify(Deno.env.get("RUN_GAME") ?? "poe2"),
       __RUN_VERSION__: JSON.stringify(Deno.env.get("RUN_VERSION") ?? "v0.8.0"),

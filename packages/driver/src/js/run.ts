@@ -57,7 +57,14 @@ async function main(): Promise<void> {
         }
       },
       onFetch: async (url, headers, body) => {
-        if (!poeOAuth) throw new Error("Fetch not implemented in shell");
+        if (!poeOAuth) {
+          const response = await fetch(url, { method: body ? "POST" : "GET", headers, body });
+          const responseHeaders: Record<string, string> = {};
+          response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+          });
+          return { body: await response.text(), error: undefined, headers: responseHeaders, status: response.status };
+        }
         poeOAuth.fetchRequests.push({ url, headers, body });
 
         const endpoint = new URL(url);

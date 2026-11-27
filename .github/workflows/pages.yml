@@ -1,0 +1,65 @@
+name: pages-poe1
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  POB_TAG: v2.68.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v3
+      - name: Install
+        run: mise run install
+      - name: Build driver (wasm)
+        run: mise run driver:build
+      - name: Pack PoE1 PoB
+        run: mise run pack --game poe1 --tag "$POB_TAG"
+      - name: Build site
+        working-directory: packages/driver
+        env:
+          BASE_PATH: /pob-web/
+          ASSET_PREFIX: /pob-web/r2
+          RUN_GAME: poe1
+          RUN_VERSION: ${{ env.POB_TAG }}
+          RUN_BUILD: release
+        run: |
+          curl -fsSL https://unpkg.com/coi-serviceworker@0.1.7/coi-serviceworker.min.js -o public/coi-serviceworker.min.js
+          deno task vite:build
+      - name: Assemble
+        run: |
+          OUT=packages/driver/site
+          mkdir -p $OUT/r2/games/poe1/versions
+          cp -r packages/packer/r2/games/poe1/versions/$POB_TAG $OUT/r2/games/poe1/versions/
+          rm -f $OUT/r2/games/poe1/versions/$POB_TAG/.pack-input.sha256
+          find $OUT -name '*.map' -delete
+          touch $OUT/.nojekyll
+          du -sh $OUT; ls -la $OUT $OUT/assets | head -60; find $OUT -size +50M -exec ls -la {} \;
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/driver/site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
