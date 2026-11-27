@@ -2,7 +2,7 @@
 // Also sets the cross-origin isolation headers PoB needs (SharedArrayBuffer).
 import { readSession } from "../functions-lib/session.js";
 
-const PUBLIC_PATHS = new Set(["/login.html", "/api/session", "/favicon.ico"]);
+const PUBLIC_PATHS = new Set(["/login", "/login.html", "/api/session", "/favicon.ico"]);
 
 function isolate(response) {
   const r = new Response(response.body, response);
@@ -21,7 +21,7 @@ export async function onRequest(context) {
     if (url.pathname.startsWith("/api/")) return new Response("Unauthorized", { status: 401 });
     const accept = context.request.headers.get("accept") || "";
     if (url.pathname === "/" || url.pathname.endsWith(".html") || accept.includes("text/html")) {
-      return Response.redirect(`${url.origin}/login.html`, 302);
+      return Response.redirect(`${url.origin}/login`, 302);
     }
     return new Response("Unauthorized", { status: 401 });
   }
