@@ -55,6 +55,7 @@ type Imports = {
   start: () => void;
   loadBuildFromCode: (code: string) => number;
   getBuildCode: () => string;
+  evalLua: (chunk: string) => string;
   onFrame: () => void;
   sentryTestCrash: () => void;
   onKeyUp: (name: string, doubleClick: number) => void;
@@ -262,6 +263,12 @@ export class DriverWorker {
     return code;
   }
 
+  async evalLua(chunk: string): Promise<string> {
+    const result = this.imports?.evalLua(chunk) ?? "";
+    this.invalidate();
+    return result;
+  }
+
   setLayerVisible(layer: number, sublayer: number, visible: boolean) {
     this.renderer?.setLayerVisible(layer, sublayer, visible);
     this.invalidate();
@@ -325,6 +332,7 @@ export class DriverWorker {
       start: module.cwrap("start", "number", []),
       loadBuildFromCode: module.cwrap("load_build_from_code", "number", ["string"]),
       getBuildCode: module.cwrap("get_build_code", "string", []),
+      evalLua: module.cwrap("eval_lua", "string", ["string"]),
       onFrame: module.cwrap("on_frame", "number", []),
       sentryTestCrash: module.cwrap("sentry_test_crash", null, []),
       onKeyUp: module.cwrap("on_key_up", "number", ["string", "number"]),

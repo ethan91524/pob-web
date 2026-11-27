@@ -581,6 +581,26 @@ int on_subscript_error(int id, const char *message) {
     return 1;
 }
 
+static char *s_eval_result = NULL;
+
+// Diagnostics: run a Lua chunk and return its first result as a string (devtools only).
+EMSCRIPTEN_KEEPALIVE
+const char* eval_lua(const char *chunk) {
+    lua_State *L = GL;
+    free(s_eval_result);
+    s_eval_result = NULL;
+    int top = lua_gettop(L);
+    if (luaL_loadstring(L, chunk) != LUA_OK || lua_pcall(L, 0, 1, 0) != LUA_OK) {
+        // error message is on the stack
+    }
+    const char *out = luaL_tolstring(L, -1, NULL);
+    size_t len = strlen(out);
+    s_eval_result = malloc(len + 1);
+    memcpy(s_eval_result, out, len + 1);
+    lua_settop(L, top);
+    return s_eval_result;
+}
+
 EMSCRIPTEN_KEEPALIVE
 int load_build_from_code(const char *code) {
     lua_State *L = GL;

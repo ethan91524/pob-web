@@ -434,6 +434,10 @@ export class Driver {
     return code;
   }
 
+  async evalLua(chunk: string): Promise<string> {
+    return (await this.driverWorker?.evalLua(chunk)) ?? "";
+  }
+
   async flushInput(): Promise<void> {
     await this.pendingClipboardAction;
     await this.driverWorker?.flushInput();

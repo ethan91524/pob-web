@@ -180,6 +180,8 @@ async function main(): Promise<void> {
   if (root) {
     await driver.attachToDOM(root);
   }
+  (window as unknown as { __pobEval?: (chunk: string) => Promise<string> }).__pobEval = (chunk) =>
+    driver.evalLua(chunk);
   if (testState) {
     testState.started = true;
     testState.loadBuildFromCode = (code) => driver.loadBuildFromCode(code);
