@@ -21,6 +21,10 @@ with zipfile.ZipFile(src) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED
         name = info.filename
         if name.startswith(LAZY_DIR + "/"):
             rel = name[len(LAZY_DIR) + 1:]
+            if not rel:
+                # Keep the folder itself: the driver mounts an in-memory store on it.
+                zout.writestr(info, b"")
+                continue
             if rel and not name.endswith("/"):
                 out = os.path.join(lazy_root, LAZY_DIR, rel)
                 os.makedirs(os.path.dirname(out), exist_ok=True)
